@@ -4,6 +4,19 @@ set -e
 
 echo "[INFO] Configurando Ubuntu como router..."
 
+# Check if we're running as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "[ERROR] Este script debe ejecutarse como root (sudo ./ubuntu_router.sh)"
+    exit 1
+fi
+
+# Check if sudo is installed, if not install it
+if ! command -v sudo &> /dev/null; then
+    echo "[INFO] sudo no está instalado. Instalando..."
+    apt update
+    apt install -y sudo
+fi
+
 # Habilitar IP forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward
 sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
@@ -52,10 +65,10 @@ echo "[INFO] Interfaces VLAN configuradas."
 # Reinciar networking
 ifdown $IFACE || true
 ifup $IFACE
-ifup ${IFACE}.10
-ifup ${IFACE}.20
-ifup ${IFACE}.30
-ifup ${IFACE}.99
+ifup ${IFACE}.10 || true
+ifup ${IFACE}.20 || true
+ifup ${IFACE}.30 || true
+ifup ${IFACE}.99 || true
 
 echo "[INFO] Interfaces VLAN levantadas."
 
@@ -68,6 +81,7 @@ iptables -A FORWARD -i $WAN_IFACE -o $IFACE -m state --state RELATED,ESTABLISHED
 iptables -A FORWARD -i $IFACE -o $WAN_IFACE -j ACCEPT
 
 # Guardar reglas de iptables
+mkdir -p /etc/iptables
 iptables-save > /etc/iptables/rules.v4
 
 echo "[INFO] Reglas de iptables aplicadas y guardadas."
@@ -87,7 +101,7 @@ ufw allow 53    # DNS
 ufw allow 80    # HTTP
 ufw allow 443   # HTTPS
 
-ufw enable
+ufw --force enable
 
 echo "[INFO] UFW configurado y habilitado."
 
